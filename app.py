@@ -403,13 +403,10 @@ def progress_tracker_page():
         tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])   
       def display_and_edit_progress(df: pd.DataFrame, source_type: str):
     """Renders an editable table for progress tracking."""
-    
     if df.empty:
         st.info(f"No {source_type} checklist items available for this scheme type.")
         return
-
-    st.subheader(f"{source_type} Take-On Items")
-    
+    st.subheader(f"{source_type} Take-On Items")    
     # --- Prepare for Display (using display names) ---
     df_display = df.copy()
     df_display = df_display.rename(columns={
@@ -418,11 +415,9 @@ def progress_tracker_page():
         'date_completed': 'Date', 
         'completed_by': 'Completed By',
         'notes': 'Notes'
-    })
-    
+    })    
     # Columns we actually want to compare later (using their display names)
     editable_cols = ['Complete', 'Date', 'Completed By', 'Notes']
-
     # Configure columns for editing
     column_config = {
         "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
@@ -435,40 +430,31 @@ def progress_tracker_page():
         "scheme_type": None,
         "type": None,
     }
-
     edited_df = st.data_editor(
         df_display,
         column_config=column_config,
         hide_index=True,
         use_container_width=True
-    )
-    
-    if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
-        
+    ) 
+    if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):      
         # --- FIX: Simplify comparison by comparing only the editable columns ---
-        # 1. Compare the editable columns from the edited data with the original data's display names.
-        
+        # 1. Compare the editable columns from the edited data with the original data's display names.     
         # Ensure edited_df and df_display are compared on the same columns and index
         comparison_df_original = df_display[editable_cols]
         comparison_df_edited = edited_df[editable_cols]
-
         changes = comparison_df_edited.compare(comparison_df_original, keep_shape=True)
-        # ----------------------------------------------------------------------
-        
+        # ----------------------------------------------------------------------    
         if not changes.empty:
-            updated_rows = []
-            
+            updated_rows = []    
             # Find which rows were edited by comparing index
             for index in changes.index:
                 # The index refers to the row number in the displayed DataFrame
-                progress_id = df.loc[index, 'progress_id']
-                
+                progress_id = df.loc[index, 'progress_id']       
                 # Get new values from the edited DataFrame (using display names)
                 new_complete = edited_df.loc[index, 'Complete']
                 new_date = edited_df.loc[index, 'Date']
                 new_by = edited_df.loc[index, 'Completed By']
-                new_notes = edited_df.loc[index, 'Notes']
-                
+                new_notes = edited_df.loc[index, 'Notes']       
                 # Prepare update payload (using database names)
                 update_payload = {
                     "is_complete": new_complete,
@@ -476,12 +462,10 @@ def progress_tracker_page():
                     "date_completed": new_date if new_complete and new_date else None, 
                     "completed_by": new_by if new_complete and new_by else None,
                     "notes": new_notes
-                }
-                
+                }          
                 # Update the database
                 supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
-                updated_rows.append(progress_id)
-            
+                updated_rows.append(progress_id)    
             st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
             st.rerun() 
         else:
