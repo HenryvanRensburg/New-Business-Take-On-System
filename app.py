@@ -434,83 +434,91 @@ def progress_tracker_page():
         
         # Function to display and edit progress (nested to maintain scope/indentation)
         def display_and_edit_progress(df: pd.DataFrame, source_type: str):
-            """Renders an editable table for progress tracking."""
-            
-            if df.empty:
-                st.info(f"No {source_type} checklist items available for this scheme type.")
-                return
+    """Renders an editable table for progress tracking."""
+    
+    if df.empty:
+        st.info(f"No {source_type} checklist items available for this scheme type.")
+        return
 
-            st.subheader(f"{source_type} Take-On Items")
-            
-            # Prepare data for Streamlit's data_editor
-            df_display = df.copy()
-            df_display = df_display.rename(columns={
-                'item_description': 'Checklist Item', 
-                'is_complete': 'Complete', 
-                'date_completed': 'Date', 
-                'completed_by': 'Completed By',
-                'notes': 'Notes' 
-            })
-            
-            # Columns we actually want to compare later (using their display names)
-            editable_cols = ['Complete', 'Date', 'Completed By', 'Notes']
+    st.subheader(f"{source_type} Take-On Items")
+    
+    # Prepare data for Streamlit's data_editor
+    df_display = df.copy()
+    df_display = df_display.rename(columns={
+        'item_description': 'Checklist Item', 
+        'is_complete': 'Complete', 
+        'date_completed': 'Date', 
+        'completed_by': 'Completed By',
+        'notes': 'Notes' 
+    })
+    
+    # Columns we actually want to compare later (using their display names)
+    editable_cols = ['Complete', 'Date', 'Completed By', 'Notes']
 
-            # Configure columns for editing
-            column_config = {
-                "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
-                "Complete": st.column_config.CheckboxColumn("Complete"),
-                "Date": st.column_config.DateColumn("Date", required=False),
-                "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
-                "Notes": st.column_config.TextColumn("Notes", width="large", required=False),
-                # Hide internal columns
-                "progress_id": None,
-                "scheme_type": None,
-                "type": None,
-            }
+    # Configure columns for editing
+    column_config = {
+        "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
+        "Complete": st.column_config.CheckboxColumn("Complete"),
+        "Date": st.column_config.DateColumn("Date", required=False),
+        "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
+        "Notes": st.column_config.TextColumn("Notes", width="large", required=False),
+        # Hide internal columns
+        "progress_id": None,
+        "scheme_type": None,
+        "type": None,
+    }
 
-            edited_df = st.data_editor(
-                df_display,
-                column_config=column_config,
-                hide_index=True,
-                use_container_width=True
-            )
+    edited_df = st.data_editor(
+        df_display,
+        column_config=column_config,
+        hide_index=True,
+        use_container_width=True
+    )
+    
+    if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
+        
+        # FIX: Ensure alignment by comparing only editable columns
+        comparison_df_original = df_display[editable_cols]
+        comparison_df_edited = edited_df[editable_cols]
+        changes = comparison_df_edited.compare(comparison_df_original, keep_shape=True)
+        
+        if not changes.empty:
+            updated_rows = []
             
-            if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
+            for index in changes.index:
+                progress_id = df.loc[index, 'progress_id']
                 
-                # FIX for ValueError: Ensure alignment by comparing only editable columns
-                comparison_df_original = df_display[editable_cols]
-                comparison_df_edited = edited_df[editable_cols]
-                changes = comparison_df_edited.compare(comparison_df_original, keep_shape=True)
-                
-                if not changes.empty:
-                    updated_rows = []
-                    
-                    for index in changes.index:
-                        progress_id = df.loc[index, 'progress_id']
-                        
-                        # Get new values from the edited DataFrame (using display names)
-                        new_complete = edited_df.loc[index, 'Complete']
-                        new_date = edited_df.loc[index, 'Date']
-                        new_by = edited_df.loc[index, 'Completed By']
-                        new_notes = edited_df.loc[index, 'Notes'] 
-                        
-                        # Prepare update payload (using database names)
-                        update_payload = {
-                            "is_complete": new_complete,
-                            "date_completed": new_date if new_complete and new_date else None, 
-                            "completed_by": new_by if new_complete and new_by else None,
-                            "notes": new_notes
-                        }
-                        
-                        # Update the database
-                        supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
-                        updated_rows.append(progress_id)
-                    
-                    st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
-                    st.rerun() 
-                else:
-                    st.info("No changes detected to save.")
+                new_complete = edited_df.loc[index, 'Complete']
+                new_date = edited_df.loc[index, 'Date']
+                new_by = edited_df.loc[index, 'Completed By']
+                new_notes = edited_df.loc[index, 'Notes'] 
 
+                # --- FIX APPLIED HERE: Convert date object to ISO string ---
+                date_to_send = None
+                if new_complete and new_date:
+                    if hasattr(new_date, 'isoformat'):
+                        date_to_send = new_date.isoformat()
+                    # Fallback if it's a timestamp object (less common but safe)
+                    elif hasattr(new_date, 'strftime'):
+                        date_to_send = new_date.strftime('%Y-%m-%d')
+                    
+                
+                # Prepare update payload (using database names)
+                update_payload = {
+                    "is_complete": new_complete,
+                    "date_completed": date_to_send, # Use the serialized string
+                    "completed_by": new_by if new_complete and new_by else None,
+                    "notes": new_notes
+                }
+                
+                # Update the database
+                supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
+                updated_rows.append(progress_id)
+            
+            st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
+            st.rerun() 
+        else:
+            st.info("No changes detected to save.")
 
         with tab_pma:
             display_and_edit_progress(df_pma, "PMA")
