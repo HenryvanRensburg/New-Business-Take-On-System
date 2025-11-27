@@ -124,14 +124,17 @@ class PDF(FPDF):
         # Table Rows
         self.set_font('Arial', '', 10)
         for index, row in data.iterrows():
-            item = row['item_description']
+            # --- FIX APPLIED HERE: Ensure item is a string, defaulting to empty string if missing ---
+            item = str(row['item_description']) if row['item_description'] is not None else '' 
+            # ----------------------------------------------------------------------------------------
             status = "Complete" if row['is_complete'] else "Pending"
-            date_str = str(row['date_completed']) if row['is_complete'] else '-'
-            completed_by = row['completed_by'] if row['is_complete'] else '-'
+            date_str = str(row['date_completed']) if row['is_complete'] and row['date_completed'] else '-'
+            completed_by = str(row['completed_by']) if row['is_complete'] and row['completed_by'] else '-'
             
             # Use multi_cell for wrapping long text
             # Calculate height for multiline cell
             line_height = 6
+            # The 'item' is now guaranteed to be a string
             item_lines = self.multi_cell(col_widths[0], line_height, item, 0, 'L', 0, dry_run=True, output='LINES')
             
             x = self.get_x()
