@@ -433,7 +433,7 @@ def progress_tracker_page():
         tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])
         
         # Function to display and edit progress (nested to maintain scope/indentation)
-        def display_and_edit_progress(df: pd.DataFrame, source_type: str):
+    def display_and_edit_progress(df: pd.DataFrame, source_type: str):
     """Renders an editable table for progress tracking."""
     
     if df.empty:
