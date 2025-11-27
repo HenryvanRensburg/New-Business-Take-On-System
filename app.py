@@ -183,12 +183,13 @@ def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
 
     pdf_output = pdf.output(dest='S')
     
-    # FIX: Check if the output is a string (str) and explicitly convert it to bytes.
-    # This ensures st.download_button always receives the required bytes format.
+    # FIX 1: Ensure output is bytes or an empty bytes object if None/empty.
     if isinstance(pdf_output, str):
         return pdf_output.encode('latin-1', errors='ignore')
     
-    # If it's already bytes, return it directly.
+    if pdf_output is None:
+        return b"" # Return empty bytes instead of None
+        
     return pdf_output
 
 # --- Application Pages ---
@@ -524,13 +525,17 @@ def progress_tracker_page():
             # Pass the full df_progress which contains both types, the PDF function will filter.
             pdf_bytes = generate_pdf_report(scheme_options[selected_scheme_id], df_progress)
             
-            # Display a download button for the PDF
-            st.download_button(
-                label="Download PDF Progress Report",
-                data=pdf_bytes,
-                file_name=f"{scheme_options[selected_scheme_id]}_TakeOn_Report_{date.today()}.pdf",
-                mime="application/pdf"
-            )
+            # FIX 2: Check if pdf_bytes is valid (not None or empty) before showing button
+            if pdf_bytes:
+                # Display a download button for the PDF
+                st.download_button(
+                    label="Download PDF Progress Report",
+                    data=pdf_bytes,
+                    file_name=f"{scheme_options[selected_scheme_id]}_TakeOn_Report_{date.today()}.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.warning("Could not generate PDF report. Check data for problematic characters or completeness.")
 
 
 # --- Main Application Logic ---
