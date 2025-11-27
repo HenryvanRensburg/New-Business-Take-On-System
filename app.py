@@ -400,9 +400,7 @@ def progress_tracker_page():
         # Split into PMA and Pretor Group items
         df_pma = df_progress[df_progress['type'] == 'PMA'].reset_index(drop=True)
         df_pretor = df_progress[df_progress['type'] == 'Pretor'].reset_index(drop=True)
-        
-        tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])
-        
+        tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])   
       def display_and_edit_progress(df: pd.DataFrame, source_type: str):
     """Renders an editable table for progress tracking."""
     
