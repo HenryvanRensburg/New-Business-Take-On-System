@@ -253,7 +253,8 @@ def new_scheme_page():
         
         col1, col2 = st.columns(2)
         with col1:
-            appointment_date = st.date_input("Appointment Date *", value="today")
+            # FIX: Changed value="today" to value=date.today() to ensure proper date object usage.
+            appointment_date = st.date_input("Appointment Date *", value=date.today())
             financial_year_end = st.date_input("Financial Year End (Date)", value=date.today())
             assigned_portfolio_manager = st.text_input("Assigned Portfolio Manager (Name) *")
             pm_email = st.text_input("PM Email Address *")
@@ -465,7 +466,7 @@ def progress_tracker_page():
                         updated_rows.append(progress_id)
                     
                     st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
-                    st.rerun()
+                    st.rerun() # Keep rerun here to immediately reflect DB changes
                 else:
                     st.info("No changes detected to save.")
 
