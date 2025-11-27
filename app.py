@@ -30,7 +30,6 @@ def fetch_data(table_name: str, columns: str = "*", filters: dict = None) -> pd.
                 query = query.eq(key, value)
         response = query.execute()
         
-        # Check if the data is a list and convert to DataFrame
         if response.data and isinstance(response.data, list):
             return pd.DataFrame(response.data)
         return pd.DataFrame()
@@ -43,7 +42,7 @@ def insert_data(table_name: str, data: dict):
     try:
         supabase.table(table_name).insert(data).execute()
         st.success(f"Successfully added to {table_name}!")
-        st.rerun() # Refresh app to see new data
+        st.rerun() 
     except Exception as e:
         st.error(f"Error inserting data into {table_name}: {e}")
 
@@ -90,7 +89,6 @@ def login_form():
 class PDF(FPDF):
     """Custom FPDF class for the progress report."""
     def header(self):
-        # FIX: Removed encoding parameter
         self.set_font('Arial', 'B', 15) 
         self.cell(0, 10, 'Pretor Group Take-On Progress Report', 0, 1, 'C')
         self.line(10, 20, 200, 20)
@@ -102,14 +100,12 @@ class PDF(FPDF):
         self.cell(0, 10, f'Page {self.page_no()}/{{nb}}', 0, 0, 'C')
 
     def chapter_title(self, title):
-        # FIX: Removed encoding parameter
         self.set_font('Arial', 'B', 12)
         self.set_fill_color(200, 220, 255)
         self.cell(0, 8, title, 0, 1, 'L', 1)
         self.ln(4)
 
     def chapter_body(self, data: pd.DataFrame, scheme_name: str):
-        # FIX: Removed encoding parameter
         self.set_font('Arial', '', 10) 
         
         # --- Defensive Data Preparation (Ensuring all data is string/no NaN) ---
@@ -119,11 +115,9 @@ class PDF(FPDF):
         data['completed_by'] = data['completed_by'].fillna('-').astype(str)
         # ----------------------------------------------------------------------
         
-        # Scheme Info
         self.chapter_title(f"Scheme: {scheme_name}")
         
         # Table Header
-        # FIX: Removed encoding parameter
         self.set_font('Arial', 'B', 10) 
         col_widths = [100, 30, 30, 30]
         self.cell(col_widths[0], 7, 'Item', 1, 0, 'L')
@@ -132,7 +126,6 @@ class PDF(FPDF):
         self.cell(col_widths[3], 7, 'Completed By', 1, 1, 'C')
         
         # Table Rows
-        # FIX: Removed encoding parameter
         self.set_font('Arial', '', 10) 
         
         for index, row in data.iterrows():
@@ -145,26 +138,22 @@ class PDF(FPDF):
             date_str = row['date_completed']
             completed_by = row['completed_by']
             
-            # Use multi_cell for wrapping long text
-            # Calculate height for multiline cell
             line_height = 6
             item_lines = self.multi_cell(col_widths[0], line_height, item, 0, 'L', 0, dry_run=True, output='LINES')
             
             x = self.get_x()
             y = self.get_y()
             
-            # Draw Item cell
             self.multi_cell(col_widths[0], line_height, item, 1, 'L', 0)
             
-            # Go back to start x and move down to the cell's max height
             self.set_xy(x + col_widths[0], y)
             
-            # Draw Status, Date, and Completed By cells aligned with the item
             cell_height = len(item_lines) * line_height
             
             self.cell(col_widths[1], cell_height, status, 1, 0, 'C')
             self.cell(col_widths[2], cell_height, date_str, 1, 0, 'C')
             self.cell(col_widths[3], cell_height, completed_by, 1, 1, 'C')
+
 
 def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     """Generates the weekly progress PDF report."""
@@ -174,23 +163,29 @@ def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     
     pdf = PDF('P', 'mm', 'A4')
     pdf.alias_nb_pages()
-    pdf.add_page()
     
-    if not pretor_data.empty:
-        pdf.chapter_body(pretor_data, scheme_name)
-    else:
-        pdf.chapter_body(pd.DataFrame({'item_description':['No Pretor Group items found or linked.'], 'is_complete':[False], 'date_completed':['-'], 'completed_by':['-']}), scheme_name)
+    try:
+        pdf.add_page()
+    
+        if not pretor_data.empty:
+            pdf.chapter_body(pretor_data, scheme_name)
+        else:
+            pdf.chapter_body(pd.DataFrame({'item_description':['No Pretor Group items found or linked.'], 'is_complete':[False], 'date_completed':['-'], 'completed_by':['-']}), scheme_name)
 
-    pdf_output = pdf.output(dest='S')
-    
-    # FIX 1: Ensure output is bytes or an empty bytes object if None/empty.
-    if isinstance(pdf_output, str):
-        return pdf_output.encode('latin-1', errors='ignore')
-    
-    if pdf_output is None:
-        return b"" # Return empty bytes instead of None
+        pdf_output = pdf.output(dest='S')
         
-    return pdf_output
+        # FIX: Ensure output is always bytes for Streamlit download button
+        if isinstance(pdf_output, str):
+            return pdf_output.encode('latin-1', errors='ignore')
+        
+        if pdf_output is None:
+            return b"" # Should not happen, but defensive
+            
+        return pdf_output
+        
+    except Exception as e:
+        st.error(f"Error during PDF generation: {e}")
+        return b"" # Return empty bytes on failure
 
 # --- Application Pages ---
 
@@ -278,7 +273,6 @@ def new_scheme_page():
         
         col1, col2 = st.columns(2)
         with col1:
-            # FIX: Using date.today() for safe initialization
             appointment_date = st.date_input("Appointment Date *", value=date.today())
             financial_year_end = st.date_input("Financial Year End (Date)", value=date.today())
             assigned_portfolio_manager = st.text_input("Assigned Portfolio Manager (Name) *")
@@ -362,7 +356,6 @@ def new_scheme_page():
                 st.success(f"Scheme '{scheme_name}' created successfully!")
                 
                 # 2. Copy Checklists (Requirements 1 & 2)
-                # Filter master items based on scheme type
                 items_to_copy = df_master_checklist[df_master_checklist['scheme_type'] == scheme_type_abbr]
                 
                 if not items_to_copy.empty:
@@ -371,10 +364,9 @@ def new_scheme_page():
                         progress_data.append({
                             "scheme_id": new_scheme_id,
                             "master_item_id": row['id'],
-                            "is_complete": False, # Start as incomplete
+                            "is_complete": False,
                         })
                     
-                    # Bulk insert into progress_tracker
                     supabase.table("progress_tracker").insert(progress_data).execute()
                     st.success(f"Copied {len(progress_data)} checklist items to the new scheme.")
                 else:
@@ -388,27 +380,24 @@ def progress_tracker_page():
     st.header("✅ Take-On Progress Tracker")
     st.markdown("---")
 
-    # Fetch all schemes and merge with progress tracker data
     df_schemes = fetch_data("schemes")
     
     if df_schemes.empty:
         st.info("Please create a new scheme first.")
         return
 
-    # Scheme Selector
     scheme_options = df_schemes.set_index('id')['scheme_name'].to_dict()
     selected_scheme_id = st.selectbox("Select Scheme", options=list(scheme_options.keys()), format_func=lambda x: scheme_options[x])
     
     if selected_scheme_id:
         
-        # Join progress_tracker with master_checklist for item details
         progress_data_list = supabase.from_('progress_tracker').select("*, master_checklist(*)").eq('scheme_id', selected_scheme_id).execute().data
         
         if not progress_data_list:
             st.info("No checklist items linked to this scheme.")
             return
 
-        # Flatten the joined data for easier use with Pandas
+        # Flatten the joined data 
         data_for_df = []
         for item in progress_data_list:
             data_for_df.append({
@@ -424,102 +413,92 @@ def progress_tracker_page():
         
         df_progress = pd.DataFrame(data_for_df)
         
-        # --- Display and Edit Progress ---
-        
-        # Split into PMA and Pretor Group items
         df_pma = df_progress[df_progress['type'] == 'PMA'].reset_index(drop=True)
         df_pretor = df_progress[df_progress['type'] == 'Pretor'].reset_index(drop=True)
         
+        # --- Nested Function Definition ---
+        def display_and_edit_progress(df: pd.DataFrame, source_type: str):
+            """Renders an editable table for progress tracking."""
+            
+            if df.empty:
+                st.info(f"No {source_type} checklist items available for this scheme type.")
+                return
+
+            st.subheader(f"{source_type} Take-On Items")
+            
+            df_display = df.copy()
+            df_display = df_display.rename(columns={
+                'item_description': 'Checklist Item', 
+                'is_complete': 'Complete', 
+                'date_completed': 'Date', 
+                'completed_by': 'Completed By',
+                'notes': 'Notes' 
+            })
+            
+            editable_cols = ['Complete', 'Date', 'Completed By', 'Notes']
+
+            column_config = {
+                "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
+                "Complete": st.column_config.CheckboxColumn("Complete"),
+                "Date": st.column_config.DateColumn("Date", required=False),
+                "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
+                "Notes": st.column_config.TextColumn("Notes", width="large", required=False),
+                "progress_id": None,
+                "scheme_type": None,
+                "type": None,
+            }
+
+            edited_df = st.data_editor(
+                df_display,
+                column_config=column_config,
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
+                
+                comparison_df_original = df_display[editable_cols]
+                comparison_df_edited = edited_df[editable_cols]
+                changes = comparison_df_edited.compare(comparison_df_original, keep_shape=True)
+                
+                if not changes.empty:
+                    updated_rows = []
+                    
+                    for index in changes.index:
+                        progress_id = df.loc[index, 'progress_id']
+                        
+                        new_complete = edited_df.loc[index, 'Complete']
+                        new_date = edited_df.loc[index, 'Date']
+                        new_by = edited_df.loc[index, 'Completed By']
+                        new_notes = edited_df.loc[index, 'Notes'] 
+
+                        # FIX: Convert date object (Timestamp/Date) to ISO string for Supabase/JSON serialization
+                        date_to_send = None
+                        if new_complete and new_date:
+                            if hasattr(new_date, 'isoformat'):
+                                date_to_send = new_date.isoformat()
+                            elif hasattr(new_date, 'strftime'):
+                                date_to_send = new_date.strftime('%Y-%m-%d')
+                            
+                        
+                        update_payload = {
+                            "is_complete": new_complete,
+                            "date_completed": date_to_send, 
+                            "completed_by": new_by if new_complete and new_by else None,
+                            "notes": new_notes
+                        }
+                        
+                        supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
+                        updated_rows.append(progress_id)
+                    
+                    st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
+                    st.rerun() 
+                else:
+                    st.info("No changes detected to save.")
+        # --- End of Nested Function Definition ---
+
         tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])
         
-        # Function to display and edit progress (nested to maintain scope/indentation)
-    def display_and_edit_progress(df: pd.DataFrame, source_type: str):
-        """Renders an editable table for progress tracking."""
-    
-    if df.empty:
-        st.info(f"No {source_type} checklist items available for this scheme type.")
-        return
-
-    st.subheader(f"{source_type} Take-On Items")
-    
-    # Prepare data for Streamlit's data_editor
-    df_display = df.copy()
-    df_display = df_display.rename(columns={
-        'item_description': 'Checklist Item', 
-        'is_complete': 'Complete', 
-        'date_completed': 'Date', 
-        'completed_by': 'Completed By',
-        'notes': 'Notes' 
-    })
-    
-    # Columns we actually want to compare later (using their display names)
-    editable_cols = ['Complete', 'Date', 'Completed By', 'Notes']
-
-    # Configure columns for editing
-    column_config = {
-        "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
-        "Complete": st.column_config.CheckboxColumn("Complete"),
-        "Date": st.column_config.DateColumn("Date", required=False),
-        "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
-        "Notes": st.column_config.TextColumn("Notes", width="large", required=False),
-        # Hide internal columns
-        "progress_id": None,
-        "scheme_type": None,
-        "type": None,
-    }
-
-    edited_df = st.data_editor(
-        df_display,
-        column_config=column_config,
-        hide_index=True,
-        use_container_width=True
-    )
-    
-    if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
-        
-        # FIX: Ensure alignment by comparing only editable columns
-        comparison_df_original = df_display[editable_cols]
-        comparison_df_edited = edited_df[editable_cols]
-        changes = comparison_df_edited.compare(comparison_df_original, keep_shape=True)
-        
-        if not changes.empty:
-            updated_rows = []
-            
-            for index in changes.index:
-                progress_id = df.loc[index, 'progress_id']
-                
-                new_complete = edited_df.loc[index, 'Complete']
-                new_date = edited_df.loc[index, 'Date']
-                new_by = edited_df.loc[index, 'Completed By']
-                new_notes = edited_df.loc[index, 'Notes'] 
-
-                # --- FIX APPLIED HERE: Convert date object to ISO string ---
-                date_to_send = None
-                if new_complete and new_date:
-                    if hasattr(new_date, 'isoformat'):
-                        date_to_send = new_date.isoformat()
-                    # Fallback if it's a timestamp object (less common but safe)
-                    elif hasattr(new_date, 'strftime'):
-                        date_to_send = new_date.strftime('%Y-%m-%d')
-                    
-                
-                # Prepare update payload (using database names)
-                update_payload = {
-                    "is_complete": new_complete,
-                    "date_completed": date_to_send, # Use the serialized string
-                    "completed_by": new_by if new_complete and new_by else None,
-                    "notes": new_notes
-                }
-                
-                # Update the database
-                supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
-                updated_rows.append(progress_id)
-            
-            st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
-            st.rerun() 
-        else:
-            st.info("No changes detected to save.")
-
         with tab_pma:
             display_and_edit_progress(df_pma, "PMA")
             
@@ -530,12 +509,10 @@ def progress_tracker_page():
             st.subheader("Weekly Progress Report (Client View)")
             st.info("This report will **only include Pretor Group items** for client-facing progress confirmation.")
             
-            # Pass the full df_progress which contains both types, the PDF function will filter.
             pdf_bytes = generate_pdf_report(scheme_options[selected_scheme_id], df_progress)
             
-            # FIX: Check if pdf_bytes contains data (is not None or empty bytes) before rendering the button
+            # FIX: Check if pdf_bytes contains data and is correct type before rendering the button
             if pdf_bytes and isinstance(pdf_bytes, bytes):
-                # Display a download button for the PDF
                 st.download_button(
                     label="Download PDF Progress Report",
                     data=pdf_bytes,
@@ -543,8 +520,7 @@ def progress_tracker_page():
                     mime="application/pdf"
                 )
             else:
-                # This message will display if pdf_bytes is None, empty bytes (b""), or still a wrong type.
-                st.warning("Could not generate PDF report. Ensure all checklist items are valid strings.")
+                st.warning("Could not generate PDF report. Check data for problematic characters or ensure items are marked complete.")
 
 
 # --- Main Application Logic ---
@@ -560,7 +536,6 @@ def main():
         st.session_state['user'] = None
 
     if st.session_state['logged_in']:
-        # Logged in view
         st.sidebar.success(f"Logged in as: {st.session_state['user'].email}")
         
         # Navigation
@@ -576,7 +551,6 @@ def main():
             progress_tracker_page()
             
     else:
-        # Not logged in view
         st.title("Welcome to the Pretor Group Take-On App")
         st.info("Please sign in on the sidebar to access the application.")
         login_form()
