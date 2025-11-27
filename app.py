@@ -91,8 +91,8 @@ def login_form():
 class PDF(FPDF):
     """Custom FPDF class for the progress report."""
     def header(self):
-        # FIX: Explicitly set encoding to cp1252 in header
-        self.set_font('Arial', 'B', 15, encoding='cp1252') 
+        # FIX: Removed redundant encoding='cp1252' parameter
+        self.set_font('Arial', 'B', 15) 
         self.cell(0, 10, 'Pretor Group Take-On Progress Report', 0, 1, 'C')
         self.line(10, 20, 200, 20)
         self.ln(5)
@@ -103,34 +103,70 @@ class PDF(FPDF):
         self.cell(0, 10, f'Page {self.page_no()}/{{nb}}', 0, 0, 'C')
 
     def chapter_title(self, title):
-        # FIX: Explicitly set encoding for the title font
-        self.set_font('Arial', 'B', 12, encoding='cp1252')
+        # FIX: Removed redundant encoding='cp1252' parameter
+        self.set_font('Arial', 'B', 12)
         self.set_fill_color(200, 220, 255)
         self.cell(0, 8, title, 0, 1, 'L', 1)
         self.ln(4)
 
     def chapter_body(self, data: pd.DataFrame, scheme_name: str):
-        # FIX: Explicitly set encoding for the body font
-        self.set_font('Arial', '', 10, encoding='cp1252') 
+        # FIX: Removed redundant encoding='cp1252' parameter
+        self.set_font('Arial', '', 10) 
         
-        # --- Defensive Data Preparation (from last fix) ---
+        # --- Defensive Data Preparation ---
         data = data.copy()
         data['item_description'] = data['item_description'].fillna('N/A').astype(str)
         data['date_completed'] = data['date_completed'].fillna('-').astype(str)
         data['completed_by'] = data['completed_by'].fillna('-').astype(str)
-        # --------------------------------------------------
+        # ----------------------------------
         
         # Scheme Info
         self.chapter_title(f"Scheme: {scheme_name}")
         
         # Table Header
-        # FIX: Explicitly set encoding for the bold font
-        self.set_font('Arial', 'B', 10, encoding='cp1252') 
+        # FIX: Removed redundant encoding='cp1252' parameter
+        self.set_font('Arial', 'B', 10) 
         col_widths = [100, 30, 30, 30]
         self.cell(col_widths[0], 7, 'Item', 1, 0, 'L')
         self.cell(col_widths[1], 7, 'Status', 1, 0, 'C')
         self.cell(col_widths[2], 7, 'Date', 1, 0, 'C')
         self.cell(col_widths[3], 7, 'Completed By', 1, 1, 'C')
+        
+        # Table Rows
+        # FIX: Removed redundant encoding='cp1252' parameter
+        self.set_font('Arial', '', 10) 
+        
+        for index, row in data.iterrows():
+            
+            # --- FINAL STRING GUARANTEE (Kept the ASCII sanitization) ---
+            # This ensures no invalid characters remain.
+            item = str(row['item_description']).encode('ascii', errors='ignore').decode('ascii')
+            # -------------------------------------------------------------------------
+            
+            status = "Complete" if row['is_complete'] else "Pending"
+            date_str = row['date_completed']
+            completed_by = row['completed_by']
+            
+            # Use multi_cell for wrapping long text
+            # Calculate height for multiline cell
+            line_height = 6
+            item_lines = self.multi_cell(col_widths[0], line_height, item, 0, 'L', 0, dry_run=True, output='LINES')
+            
+            x = self.get_x()
+            y = self.get_y()
+            
+            # Draw Item cell
+            self.multi_cell(col_widths[0], line_height, item, 1, 'L', 0)
+            
+            # Go back to start x and move down to the cell's max height
+            self.set_xy(x + col_widths[0], y)
+            
+            # Draw Status, Date, and Completed By cells aligned with the item
+            cell_height = len(item_lines) * line_height
+            
+            self.cell(col_widths[1], cell_height, status, 1, 0, 'C')
+            self.cell(col_widths[2], cell_height, date_str, 1, 0, 'C')
+            self.cell(col_widths[3], cell_height, completed_by, 1, 1, 'C')
         
         # Table Rows
         # FIX: Reset back to regular font with explicit encoding
