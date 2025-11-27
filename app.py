@@ -373,6 +373,7 @@ def progress_tracker_page():
     if selected_scheme_id:
         
         # Join progress_tracker with master_checklist for item details
+        # The select query will automatically bring back the 'notes' column if the SQL ALTER was run.
         progress_data_list = supabase.from_('progress_tracker').select("*, master_checklist(*)").eq('scheme_id', selected_scheme_id).execute().data
         
         if not progress_data_list:
@@ -400,8 +401,114 @@ def progress_tracker_page():
         # Split into PMA and Pretor Group items
         df_pma = df_progress[df_progress['type'] == 'PMA'].reset_index(drop=True)
         df_pretor = df_progress[df_progress['type'] == 'Pretor'].reset_index(drop=True)
-        tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])   
-      def display_and_edit_progress(df: pd.DataFrame, source_type: str):
+        
+        tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])
+        
+        # Function to display and edit progress (nested to maintain scope/indentation)
+        def display_and_edit_progress(df: pd.DataFrame, source_type: str):
+            """Renders an editable table for progress tracking."""
+            
+            if df.empty:
+                st.info(f"No {source_type} checklist items available for this scheme type.")
+                return
+
+            st.subheader(f"{source_type} Take-On Items")
+            
+            # Prepare data for Streamlit's data_editor
+            df_display = df.copy()
+            df_display = df_display.rename(columns={
+                'item_description': 'Checklist Item', 
+                'is_complete': 'Complete', 
+                'date_completed': 'Date', 
+                'completed_by': 'Completed By',
+                'notes': 'Notes' # ADDED: Rename for display
+            })
+            
+            # Columns we actually want to compare later (using their display names)
+            editable_cols = ['Complete', 'Date', 'Completed By', 'Notes']
+
+            # Configure columns for editing
+            column_config = {
+                "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
+                "Complete": st.column_config.CheckboxColumn("Complete"),
+                "Date": st.column_config.DateColumn("Date", required=False),
+                "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
+                "Notes": st.column_config.TextColumn("Notes", width="large", required=False), # ADDED: Allow notes editing
+                # Hide internal columns
+                "progress_id": None,
+                "scheme_type": None,
+                "type": None,
+            }
+
+            edited_df = st.data_editor(
+                df_display,
+                column_config=column_config,
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
+                
+                # FIX for ValueError: Ensure alignment by comparing only editable columns
+                comparison_df_original = df_display[editable_cols]
+                comparison_df_edited = edited_df[editable_cols]
+                changes = comparison_df_edited.compare(comparison_df_original, keep_shape=True)
+                
+                if not changes.empty:
+                    updated_rows = []
+                    
+                    # Find which rows were edited by comparing index
+                    for index in changes.index:
+                        progress_id = df.loc[index, 'progress_id']
+                        
+                        # Get new values from the edited DataFrame (using display names)
+                        new_complete = edited_df.loc[index, 'Complete']
+                        new_date = edited_df.loc[index, 'Date']
+                        new_by = edited_df.loc[index, 'Completed By']
+                        new_notes = edited_df.loc[index, 'Notes'] # ADDED: Get new notes
+                        
+                        # Prepare update payload (using database names)
+                        update_payload = {
+                            "is_complete": new_complete,
+                            "date_completed": new_date if new_complete and new_date else None, 
+                            "completed_by": new_by if new_complete and new_by else None,
+                            "notes": new_notes # ADDED: Include notes in payload
+                        }
+                        
+                        # Update the database
+                        supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
+                        updated_rows.append(progress_id)
+                    
+                    st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
+                    st.rerun() 
+                else:
+                    st.info("No changes detected to save.")
+
+
+        with tab_pma:
+            # The nested function display_and_edit_progress is called here
+            display_and_edit_progress(df_pma, "PMA")
+            
+        with tab_pretor:
+            # The nested function display_and_edit_progress is called here
+            display_and_edit_progress(df_pretor, "Pretor Group")
+
+        with tab_report:
+            st.subheader("Weekly Progress Report (Client View)")
+            st.info("This report will **only include Pretor Group items** for client-facing progress confirmation.")
+            
+            # Pass the full df_progress which contains both types, the PDF function will filter.
+            pdf_bytes = generate_pdf_report(scheme_options[selected_scheme_id], df_progress)
+            
+            # Display a download button for the PDF
+            st.download_button(
+                label="Download PDF Progress Report",
+                data=pdf_bytes,
+                file_name=f"{scheme_options[selected_scheme_id]}_TakeOn_Report_{date.today()}.pdf",
+                mime="application/pdf"
+            )
+            
+    def display_and_edit_progress(df: pd.DataFrame, source_type: str):
     """Renders an editable table for progress tracking."""
     if df.empty:
         st.info(f"No {source_type} checklist items available for this scheme type.")
