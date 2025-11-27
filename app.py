@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 from datetime import date
-from fpdf import FPDF # Used for PDF generation
+from fpdf2 import FPDF # Used for PDF generation
 import os # For environment variables
 
 # --- Configuration and Initialization (Refactoring) ---
