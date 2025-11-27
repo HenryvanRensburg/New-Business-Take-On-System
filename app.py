@@ -110,6 +110,16 @@ class PDF(FPDF):
     def chapter_body(self, data: pd.DataFrame, scheme_name: str):
         self.set_font('Arial', '', 10)
         
+        # Ensure that ALL necessary columns are explicitly converted to string 
+        # for robust PDF processing before the row iteration begins.
+        data = data.copy()
+        
+        # Use .fillna('') to replace any None/NaN values with an empty string 
+        # before converting to type string.
+        data['item_description'] = data['item_description'].fillna('').astype(str)
+        data['date_completed'] = data['date_completed'].fillna('').astype(str)
+        data['completed_by'] = data['completed_by'].fillna('').astype(str)
+        
         # Scheme Info
         self.chapter_title(f"Scheme: {scheme_name}")
         
@@ -125,25 +135,17 @@ class PDF(FPDF):
         self.set_font('Arial', '', 10)
         for index, row in data.iterrows():
             
-            # Ensure item description is a string
-            item = str(row['item_description']) if row['item_description'] is not None else '' 
-            
+            # Since the columns were pre-cast, we can use them directly.
+            # Replace empty strings ('') with '-' for better display if not completed.
+            item = row['item_description']
             status = "Complete" if row['is_complete'] else "Pending"
-            
-            # --- FIX APPLIED HERE: Ensure date_completed is a string or '-' ---
-            date_val = row['date_completed']
-            date_str = str(date_val) if date_val and date_val != '-' else '-'
-            # ------------------------------------------------------------------
-            
-            # --- FIX APPLIED HERE: Ensure completed_by is a string or '-' ---
-            completed_by_val = row['completed_by']
-            completed_by = str(completed_by_val) if completed_by_val and completed_by_val != '-' else '-'
-            # ---------------------------------------------------------------
+            date_str = row['date_completed'] if row['date_completed'] else '-'
+            completed_by = row['completed_by'] if row['completed_by'] else '-'
             
             # Use multi_cell for wrapping long text
             # Calculate height for multiline cell
             line_height = 6
-            # The 'item' is now guaranteed to be a string
+            # 'item' is now guaranteed to be a string due to .astype(str) above
             item_lines = self.multi_cell(col_widths[0], line_height, item, 0, 'L', 0, dry_run=True, output='LINES')
             
             x = self.get_x()
