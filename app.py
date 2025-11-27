@@ -182,8 +182,15 @@ def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     else:
         pdf.chapter_body(pd.DataFrame({'item_description':['No Pretor Group items found or linked.'], 'is_complete':[False], 'date_completed':['-'], 'completed_by':['-']}), scheme_name)
 
-    # FIX: Remove .encode() as pdf.output(dest='S') already returns bytes.
-    return pdf.output(dest='S')
+    pdf_output = pdf.output(dest='S')
+    
+    # FIX: Check if the output is a string (str) and explicitly convert it to bytes.
+    # If it's already bytes, it remains bytes. This resolves the StreamlitAPIException.
+    if isinstance(pdf_output, str):
+        return pdf_output.encode('latin-1', errors='ignore')
+    
+    # If it's already bytes, return it directly.
+    return pdf_output
 
 # --- Application Pages ---
 
