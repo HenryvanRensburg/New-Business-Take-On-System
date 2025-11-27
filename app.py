@@ -253,7 +253,6 @@ def new_scheme_page():
         
         col1, col2 = st.columns(2)
         with col1:
-            # FIX: Changed value="today" to value=date.today() to ensure proper date object usage.
             appointment_date = st.date_input("Appointment Date *", value=date.today())
             financial_year_end = st.date_input("Financial Year End (Date)", value=date.today())
             assigned_portfolio_manager = st.text_input("Assigned Portfolio Manager (Name) *")
@@ -308,8 +307,8 @@ def new_scheme_page():
                 "previous_portfolio_manager": previous_portfolio_manager,
                 "pma_email": pma_email,
                 "pma_phone": pma_phone,
-                "appointment_date": appointment_date,
-                "financial_year_end": financial_year_end,
+                "appointment_date": appointment_date.isoformat(), # FIXED
+                "financial_year_end": financial_year_end.isoformat(), # FIXED
                 "number_of_units": number_of_units,
                 "management_fees": management_fees,
                 "erf_number": erf_number,
@@ -324,7 +323,7 @@ def new_scheme_page():
                 "physical_address": st.session_state.physical_address,
                 "assigned_portfolio_manager": assigned_portfolio_manager,
                 "pm_email": pm_email,
-                "initial_request_date": initial_request_date
+                "initial_request_date": initial_request_date.isoformat() # FIXED
             }
             
             try:
