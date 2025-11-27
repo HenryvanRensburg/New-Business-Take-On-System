@@ -389,7 +389,8 @@ def progress_tracker_page():
                 'type': item['master_checklist']['type'],
                 'is_complete': item['is_complete'],
                 'date_completed': item['date_completed'],
-                'completed_by': item['completed_by']
+                'completed_by': item['completed_by'],
+                'notes': item['notes'] # ADDED: Retrieve notes field
             })
         
         df_progress = pd.DataFrame(data_for_df)
@@ -417,7 +418,8 @@ def progress_tracker_page():
                 'item_description': 'Checklist Item', 
                 'is_complete': 'Complete', 
                 'date_completed': 'Date', 
-                'completed_by': 'Completed By'
+                'completed_by': 'Completed By',
+                'notes': 'Notes' # ADDED: Rename for display
             })
             
             # Configure columns for editing
@@ -426,6 +428,7 @@ def progress_tracker_page():
                 "Complete": st.column_config.CheckboxColumn("Complete"),
                 "Date": st.column_config.DateColumn("Date", required=False),
                 "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
+                "Notes": st.column_config.TextColumn("Notes", width="large", required=False), # ADDED: Allow notes editing
                 # Hide internal columns
                 "progress_id": None,
                 "scheme_type": None,
@@ -440,7 +443,9 @@ def progress_tracker_page():
             )
             
             if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
-                changes = edited_df.compare(df_display.drop(columns=['progress_id', 'scheme_type', 'type']), keep_shape=True)
+                # Need to use the full list of columns in df_display for comparison
+                cols_to_drop = ['progress_id', 'scheme_type', 'type']
+                changes = edited_df.compare(df_display.drop(columns=cols_to_drop), keep_shape=True)
                 
                 if not changes.empty:
                     updated_rows = []
@@ -452,12 +457,14 @@ def progress_tracker_page():
                         new_complete = edited_df.loc[index, 'Complete']
                         new_date = edited_df.loc[index, 'Date']
                         new_by = edited_df.loc[index, 'Completed By']
+                        new_notes = edited_df.loc[index, 'Notes'] # ADDED: Get new notes
                         
                         # Prepare update payload
                         update_payload = {
                             "is_complete": new_complete,
                             "date_completed": new_date if new_complete and new_date else None,
-                            "completed_by": new_by if new_complete and new_by else None
+                            "completed_by": new_by if new_complete and new_by else None,
+                            "notes": new_notes # ADDED: Include notes in payload
                         }
                         
                         # Update the database
@@ -465,12 +472,15 @@ def progress_tracker_page():
                         updated_rows.append(progress_id)
                     
                     st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
-                    st.rerun() # Keep rerun here to immediately reflect DB changes
+                    st.rerun() 
                 else:
                     st.info("No changes detected to save.")
 
 
         with tab_pma:
+            # We only want notes on Pretor Group items as requested, so we keep PMA items notes hidden/unused here
+            # or you can display them if needed for PMA tracking. I will only apply the changes to the Pretor tab logic 
+            # as the request focused on 'Pretor Group take-on items'. 
             display_and_edit_progress(df_pma, "PMA")
             
         with tab_pretor:
@@ -490,7 +500,6 @@ def progress_tracker_page():
                 file_name=f"{scheme_options[selected_scheme_id]}_TakeOn_Report_{date.today()}.pdf",
                 mime="application/pdf"
             )
-
 
 # --- Main Application Logic ---
 
