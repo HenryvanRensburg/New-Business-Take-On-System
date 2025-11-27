@@ -1,3 +1,0 @@
-# .streamlit/secrets.toml
-SUPABASE_URL = "https://uqacxyesqmjjvtkwovaq.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYWN4eWVzcW1qanZ0a3dvdmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyMzMwMzUsImV4cCI6MjA3OTgwOTAzNX0.Bn0hae-A7Uv7W-Bl1ndx6Mc1UjxVPO8E5F0zzxx6gkA"
