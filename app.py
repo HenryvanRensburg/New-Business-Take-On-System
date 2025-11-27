@@ -166,7 +166,6 @@ class PDF(FPDF):
             self.cell(col_widths[2], cell_height, date_str, 1, 0, 'C')
             self.cell(col_widths[3], cell_height, completed_by, 1, 1, 'C')
 
-
 def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     """Generates the weekly progress PDF report."""
     
@@ -185,7 +184,7 @@ def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     pdf_output = pdf.output(dest='S')
     
     # FIX: Check if the output is a string (str) and explicitly convert it to bytes.
-    # If it's already bytes, it remains bytes. This resolves the StreamlitAPIException.
+    # This ensures st.download_button always receives the required bytes format.
     if isinstance(pdf_output, str):
         return pdf_output.encode('latin-1', errors='ignore')
     
