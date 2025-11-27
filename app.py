@@ -508,7 +508,7 @@ def progress_tracker_page():
                 mime="application/pdf"
             )
             
-    def display_and_edit_progress(df: pd.DataFrame, source_type: str):
+def display_and_edit_progress(df: pd.DataFrame, source_type: str):
     """Renders an editable table for progress tracking."""
     if df.empty:
         st.info(f"No {source_type} checklist items available for this scheme type.")
