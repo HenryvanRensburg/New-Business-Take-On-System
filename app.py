@@ -110,15 +110,13 @@ class PDF(FPDF):
     def chapter_body(self, data: pd.DataFrame, scheme_name: str):
         self.set_font('Arial', '', 10)
         
-        # Ensure that ALL necessary columns are explicitly converted to string 
-        # for robust PDF processing before the row iteration begins.
+        # --- Defensive Data Preparation ---
+        # 1. Ensure all columns used in PDF cells are converted to string and fill NaNs.
         data = data.copy()
-        
-        # Use .fillna('') to replace any None/NaN values with an empty string 
-        # before converting to type string.
-        data['item_description'] = data['item_description'].fillna('').astype(str)
-        data['date_completed'] = data['date_completed'].fillna('').astype(str)
-        data['completed_by'] = data['completed_by'].fillna('').astype(str)
+        data['item_description'] = data['item_description'].fillna('N/A').astype(str)
+        data['date_completed'] = data['date_completed'].fillna('-').astype(str)
+        data['completed_by'] = data['completed_by'].fillna('-').astype(str)
+        # ----------------------------------
         
         # Scheme Info
         self.chapter_title(f"Scheme: {scheme_name}")
@@ -135,17 +133,19 @@ class PDF(FPDF):
         self.set_font('Arial', '', 10)
         for index, row in data.iterrows():
             
-            # Since the columns were pre-cast, we can use them directly.
-            # Replace empty strings ('') with '-' for better display if not completed.
-            item = row['item_description']
+            # --- FINAL STRING GUARANTEE ---
+            # Cast the item description to string one last time.
+            item = str(row['item_description'])
+            # ------------------------------
+            
             status = "Complete" if row['is_complete'] else "Pending"
-            date_str = row['date_completed'] if row['date_completed'] else '-'
-            completed_by = row['completed_by'] if row['completed_by'] else '-'
+            date_str = row['date_completed']
+            completed_by = row['completed_by']
             
             # Use multi_cell for wrapping long text
             # Calculate height for multiline cell
             line_height = 6
-            # 'item' is now guaranteed to be a string due to .astype(str) above
+            # The 'item' is now guaranteed to be a string.
             item_lines = self.multi_cell(col_widths[0], line_height, item, 0, 'L', 0, dry_run=True, output='LINES')
             
             x = self.get_x()
@@ -159,10 +159,11 @@ class PDF(FPDF):
             
             # Draw Status, Date, and Completed By cells aligned with the item
             cell_height = len(item_lines) * line_height
+            
+            # These variables are safe strings due to the casting done outside the loop.
             self.cell(col_widths[1], cell_height, status, 1, 0, 'C')
             self.cell(col_widths[2], cell_height, date_str, 1, 0, 'C')
             self.cell(col_widths[3], cell_height, completed_by, 1, 1, 'C')
-
 
 def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     """Generates the weekly progress PDF report."""
