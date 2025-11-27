@@ -182,8 +182,8 @@ def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     else:
         pdf.chapter_body(pd.DataFrame({'item_description':['No Pretor Group items found or linked.'], 'is_complete':[False], 'date_completed':['-'], 'completed_by':['-']}), scheme_name)
 
-    # FIX: Using UTF-8 encoding for robust output
-    return pdf.output(dest='S').encode('utf-8', errors='ignore') 
+    # FIX: Remove .encode() as pdf.output(dest='S') already returns bytes.
+    return pdf.output(dest='S')
 
 # --- Application Pages ---
 
