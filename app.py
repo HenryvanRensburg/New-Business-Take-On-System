@@ -434,7 +434,7 @@ def progress_tracker_page():
         
         # Function to display and edit progress (nested to maintain scope/indentation)
     def display_and_edit_progress(df: pd.DataFrame, source_type: str):
-    """Renders an editable table for progress tracking."""
+        """Renders an editable table for progress tracking."""
     
     if df.empty:
         st.info(f"No {source_type} checklist items available for this scheme type.")
