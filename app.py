@@ -525,8 +525,8 @@ def progress_tracker_page():
             # Pass the full df_progress which contains both types, the PDF function will filter.
             pdf_bytes = generate_pdf_report(scheme_options[selected_scheme_id], df_progress)
             
-            # FIX 2: Check if pdf_bytes is valid (not None or empty) before showing button
-            if pdf_bytes:
+            # FIX: Check if pdf_bytes contains data (is not None or empty bytes) before rendering the button
+            if pdf_bytes and isinstance(pdf_bytes, bytes):
                 # Display a download button for the PDF
                 st.download_button(
                     label="Download PDF Progress Report",
@@ -535,7 +535,8 @@ def progress_tracker_page():
                     mime="application/pdf"
                 )
             else:
-                st.warning("Could not generate PDF report. Check data for problematic characters or completeness.")
+                # This message will display if pdf_bytes is None, empty bytes (b""), or still a wrong type.
+                st.warning("Could not generate PDF report. Ensure all checklist items are valid strings.")
 
 
 # --- Main Application Logic ---
