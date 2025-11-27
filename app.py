@@ -403,79 +403,91 @@ def progress_tracker_page():
         
         tab_pma, tab_pretor, tab_report = st.tabs(["PMA Items", "Pretor Group Items", "Progress Report"])
         
-        def display_and_edit_progress(df: pd.DataFrame, source_type: str):
-            """Renders an editable table for progress tracking."""
-            
-            if df.empty:
-                st.info(f"No {source_type} checklist items available for this scheme type.")
-                return
+      def display_and_edit_progress(df: pd.DataFrame, source_type: str):
+    """Renders an editable table for progress tracking."""
+    
+    if df.empty:
+        st.info(f"No {source_type} checklist items available for this scheme type.")
+        return
 
-            st.subheader(f"{source_type} Take-On Items")
-            
-            # Prepare data for Streamlit's data_editor
-            df_display = df.copy()
-            df_display = df_display.rename(columns={
-                'item_description': 'Checklist Item', 
-                'is_complete': 'Complete', 
-                'date_completed': 'Date', 
-                'completed_by': 'Completed By',
-                'notes': 'Notes' # ADDED: Rename for display
-            })
-            
-            # Configure columns for editing
-            column_config = {
-                "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
-                "Complete": st.column_config.CheckboxColumn("Complete"),
-                "Date": st.column_config.DateColumn("Date", required=False),
-                "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
-                "Notes": st.column_config.TextColumn("Notes", width="large", required=False), # ADDED: Allow notes editing
-                # Hide internal columns
-                "progress_id": None,
-                "scheme_type": None,
-                "type": None,
-            }
+    st.subheader(f"{source_type} Take-On Items")
+    
+    # --- Prepare for Display (using display names) ---
+    df_display = df.copy()
+    df_display = df_display.rename(columns={
+        'item_description': 'Checklist Item', 
+        'is_complete': 'Complete', 
+        'date_completed': 'Date', 
+        'completed_by': 'Completed By',
+        'notes': 'Notes'
+    })
+    
+    # Columns we actually want to compare later (using their display names)
+    editable_cols = ['Complete', 'Date', 'Completed By', 'Notes']
 
-            edited_df = st.data_editor(
-                df_display,
-                column_config=column_config,
-                hide_index=True,
-                use_container_width=True
-            )
+    # Configure columns for editing
+    column_config = {
+        "Checklist Item": st.column_config.TextColumn("Checklist Item", disabled=True),
+        "Complete": st.column_config.CheckboxColumn("Complete"),
+        "Date": st.column_config.DateColumn("Date", required=False),
+        "Completed By": st.column_config.SelectboxColumn("Completed By", options=["Me", "Portfolio Assistant", "Bookkeeper"], required=False),
+        "Notes": st.column_config.TextColumn("Notes", width="large", required=False),
+        # Hide internal columns
+        "progress_id": None,
+        "scheme_type": None,
+        "type": None,
+    }
+
+    edited_df = st.data_editor(
+        df_display,
+        column_config=column_config,
+        hide_index=True,
+        use_container_width=True
+    )
+    
+    if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
+        
+        # --- FIX: Simplify comparison by comparing only the editable columns ---
+        # 1. Compare the editable columns from the edited data with the original data's display names.
+        
+        # Ensure edited_df and df_display are compared on the same columns and index
+        comparison_df_original = df_display[editable_cols]
+        comparison_df_edited = edited_df[editable_cols]
+
+        changes = comparison_df_edited.compare(comparison_df_original, keep_shape=True)
+        # ----------------------------------------------------------------------
+        
+        if not changes.empty:
+            updated_rows = []
             
-            if st.button(f"Save {source_type} Changes", key=f"save_{source_type}"):
-                # Need to use the full list of columns in df_display for comparison
-                cols_to_drop = ['progress_id', 'scheme_type', 'type']
-                changes = edited_df.compare(df_display.drop(columns=cols_to_drop), keep_shape=True)
+            # Find which rows were edited by comparing index
+            for index in changes.index:
+                # The index refers to the row number in the displayed DataFrame
+                progress_id = df.loc[index, 'progress_id']
                 
-                if not changes.empty:
-                    updated_rows = []
-                    # Find which rows were edited by comparing index
-                    for index in changes.index:
-                        progress_id = df.loc[index, 'progress_id']
-                        
-                        # Get new values from the edited DataFrame
-                        new_complete = edited_df.loc[index, 'Complete']
-                        new_date = edited_df.loc[index, 'Date']
-                        new_by = edited_df.loc[index, 'Completed By']
-                        new_notes = edited_df.loc[index, 'Notes'] # ADDED: Get new notes
-                        
-                        # Prepare update payload
-                        update_payload = {
-                            "is_complete": new_complete,
-                            "date_completed": new_date if new_complete and new_date else None,
-                            "completed_by": new_by if new_complete and new_by else None,
-                            "notes": new_notes # ADDED: Include notes in payload
-                        }
-                        
-                        # Update the database
-                        supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
-                        updated_rows.append(progress_id)
-                    
-                    st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
-                    st.rerun() 
-                else:
-                    st.info("No changes detected to save.")
-
+                # Get new values from the edited DataFrame (using display names)
+                new_complete = edited_df.loc[index, 'Complete']
+                new_date = edited_df.loc[index, 'Date']
+                new_by = edited_df.loc[index, 'Completed By']
+                new_notes = edited_df.loc[index, 'Notes']
+                
+                # Prepare update payload (using database names)
+                update_payload = {
+                    "is_complete": new_complete,
+                    # isoformat() is not needed here as st.data_editor should return a proper date/datetime object
+                    "date_completed": new_date if new_complete and new_date else None, 
+                    "completed_by": new_by if new_complete and new_by else None,
+                    "notes": new_notes
+                }
+                
+                # Update the database
+                supabase.table('progress_tracker').update(update_payload).eq('id', progress_id).execute()
+                updated_rows.append(progress_id)
+            
+            st.success(f"Successfully updated {len(updated_rows)} item(s) in the {source_type} list.")
+            st.rerun() 
+        else:
+            st.info("No changes detected to save.")
 
         with tab_pma:
             # We only want notes on Pretor Group items as requested, so we keep PMA items notes hidden/unused here
