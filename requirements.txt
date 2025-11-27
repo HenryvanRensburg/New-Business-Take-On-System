@@ -1,4 +1,0 @@
-streamlit
-supabase-py
-pandas
-fpdf2
