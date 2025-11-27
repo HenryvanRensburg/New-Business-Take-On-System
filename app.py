@@ -111,7 +111,6 @@ class PDF(FPDF):
         self.set_font('Arial', '', 10)
         
         # --- Defensive Data Preparation ---
-        # 1. Ensure all columns used in PDF cells are converted to string and fill NaNs.
         data = data.copy()
         data['item_description'] = data['item_description'].fillna('N/A').astype(str)
         data['date_completed'] = data['date_completed'].fillna('-').astype(str)
@@ -128,6 +127,39 @@ class PDF(FPDF):
         self.cell(col_widths[1], 7, 'Status', 1, 0, 'C')
         self.cell(col_widths[2], 7, 'Date', 1, 0, 'C')
         self.cell(col_widths[3], 7, 'Completed By', 1, 1, 'C')
+        
+        # Table Rows
+        self.set_font('Arial', '', 10)
+        for index, row in data.iterrows():
+            
+            # --- FIX: Convert item string to pure ASCII, ignoring problem characters ---
+            item = str(row['item_description']).encode('ascii', errors='ignore').decode('ascii')
+            # -------------------------------------------------------------------------
+            
+            status = "Complete" if row['is_complete'] else "Pending"
+            date_str = row['date_completed']
+            completed_by = row['completed_by']
+            
+            # Use multi_cell for wrapping long text
+            # Calculate height for multiline cell
+            line_height = 6
+            item_lines = self.multi_cell(col_widths[0], line_height, item, 0, 'L', 0, dry_run=True, output='LINES')
+            
+            x = self.get_x()
+            y = self.get_y()
+            
+            # Draw Item cell
+            self.multi_cell(col_widths[0], line_height, item, 1, 'L', 0)
+            
+            # Go back to start x and move down to the cell's max height
+            self.set_xy(x + col_widths[0], y)
+            
+            # Draw Status, Date, and Completed By cells aligned with the item
+            cell_height = len(item_lines) * line_height
+            
+            self.cell(col_widths[1], cell_height, status, 1, 0, 'C')
+            self.cell(col_widths[2], cell_height, date_str, 1, 0, 'C')
+            self.cell(col_widths[3], cell_height, completed_by, 1, 1, 'C')
         
         # Table Rows
         self.set_font('Arial', '', 10)
@@ -180,7 +212,7 @@ def generate_pdf_report(scheme_name: str, progress_data: pd.DataFrame) -> bytes:
     else:
         pdf.chapter_body(pd.DataFrame({'item_description':['No Pretor Group items found or linked.'], 'is_complete':[False], 'date_completed':['-'], 'completed_by':['-']}), scheme_name)
 
-    return pdf.output(dest='S').encode('latin-1') # Return as bytes
+    return pdf.output(dest='S').encode('utf-8', errors='ignore') # Return as bytes
 
 # --- Application Pages ---
 
